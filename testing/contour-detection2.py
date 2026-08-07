@@ -1,49 +1,48 @@
 import cv2 
 import numpy as np
 
-img = cv2.imread("/home/pi/crystal-imaging/testing/nacl3.jpg",cv2.IMREAD_GRAYSCALE )
+img = cv2.imread("/home/pi/crystal-imaging/testing/source_imgs/nacl1.jpg",cv2.IMREAD_GRAYSCALE )
 img_h, img_w = img.shape[:2]
 
-# Binarize image (ensure shapes are white (255) on black (0))
 _, thresh = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
 
-# Find contours with full hierarchy
 contours, hierarchy = cv2.findContours(thresh, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
 
 output = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
 
 if hierarchy is not None:
-	hierarchy = hierarchy[0]  # Reshape to (N, 4)
+	hierarchy = hierarchy[0]  
     
 	for i, cnt in enumerate(contours):
 		x, y, w, h = cv2.boundingRect(cnt)
-        
-        # Skip contours that cover almost the entire image frame (canvas border)
+
 		if w >= img_w - 2 and h >= img_h - 2:
 			continue
 
-		child_idx = hierarchy[i][2]   # First child contour index
-		parent_idx = hierarchy[i][3]  # Parent contour index
-
-        # Check if the contour is an outer boundary of a shape
-        # (either parent is -1, OR parent is the full canvas border contour)
+		parent_idx = hierarchy[i][3]  
+		child_idx = hierarchy[i][2]  
+		
 		is_outer = False
 		if parent_idx == -1:
 			is_outer = True
 		else:
-            # If parent is the full image border, treat this as a top-level shape
 			px, py, pw, ph = cv2.boundingRect(contours[parent_idx])
 			if pw >= img_w - 2 and ph >= img_h - 2:
 				is_outer = True
 
 		if is_outer:
-            # A stroke-based closed shape will enclose a hole (has a child)
 			is_closed = child_idx >= 0
 			if is_closed:
 				color = (0, 255, 0)
 				label = "Closed"
 				cv2.drawContours(output, contours, i, color, 2)
+				#print(contours[i])
+				rect = cv2.boundingRect(contours[i])
+				x,y,w,h = rect
+				roi = img[y:y+h, x:x+h]
+				cv2.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
 				cv2.putText(output, label, (x, max(y - 5, 15)),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-cv2.imshow('contours', output)
-cv2.waitKey(0)
+				filename = "/home/pi/crystal-imaging/testing/cropped_imgs/crystal_" + str(i) + ".jpg"
+				cv2.imwrite(filename,roi)
+				cv2.imshow('contours', roi)
+				cv2.waitKey(0)
